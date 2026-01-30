@@ -2,32 +2,32 @@ import csv
 import os
 from datetime import datetime
 
-# Log file name
-LOG_FILE = "prediction_logs.csv"
+LOG_FILE = "prediction_feedback_log.csv"
 
 
-def log_prediction(user_input, prediction, probability):
+def log_event(model_name, user_input, prediction, probability, feedback=None):
     """
-    Logs stroke prediction events for monitoring and auditing.
+    Logs prediction + feedback events for monitoring.
 
     Parameters:
-    - user_input (dict): Patient feature inputs
-    - prediction (int): Model output (0 = No Stroke, 1 = Stroke)
-    - probability (float): Confidence score
+    - model_name (str): v1 or v2 model name
+    - user_input (dict): features entered by user
+    - prediction (int): model output (0 or 1)
+    - probability (float): predicted probability of stroke
+    - feedback (str): optional user feedback
     """
 
-    # Create timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Prepare row data
     log_row = {
         "timestamp": timestamp,
+        "model": model_name,
         "inputs": str(user_input),
         "prediction": prediction,
-        "probability": probability
+        "probability": probability,
+        "feedback": feedback
     }
 
-    # Check if file exists (write header if not)
     file_exists = os.path.isfile(LOG_FILE)
 
     with open(LOG_FILE, mode="a", newline="") as file:
@@ -38,4 +38,3 @@ def log_prediction(user_input, prediction, probability):
 
         writer.writerow(log_row)
 
-    print("✅ Prediction logged successfully.")
