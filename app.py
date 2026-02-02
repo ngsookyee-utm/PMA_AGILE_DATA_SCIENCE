@@ -3,18 +3,22 @@ import pandas as pd
 import joblib
 from pathlib import Path
 import uuid
+import os
 
 from log_utils import log_event
 
+# Set the page configuration
 st.set_page_config(page_title="Stroke Prediction (V1 vs V2)", layout="wide")
 
 BASE_DIR = Path(__file__).resolve().parent
 V1_PATH = BASE_DIR / "stroke_prediction_model_v1.pkl"
 V2_PATH = BASE_DIR / "stroke_prediction_model_v2.pkl"
 
+# Function for displaying prediction text
 def prediction_text(pred: int) -> str:
     return "Stroke" if int(pred) == 1 else "No Stroke"
 
+# Function for displaying risk level
 def risk_label(prob: float) -> str:
     if prob >= 0.70:
         return "High"
@@ -22,12 +26,14 @@ def risk_label(prob: float) -> str:
         return "Medium"
     return "Low"
 
+# Function for displaying probability gauge
 def probability_gauge(prob: float, label: str):
     pct = int(round(prob * 100))
     st.write(f"**Probability Gauge ({label})**")
     st.progress(pct)
     st.metric("Predicted Stroke Probability", f"{prob:.3f}")
 
+# Function to load models
 @st.cache_resource
 def load_models():
     return joblib.load(V1_PATH), joblib.load(V2_PATH)
@@ -38,9 +44,11 @@ if "session_id" not in st.session_state:
 if "history" not in st.session_state:
     st.session_state.history = []
 
+# Display the title of the app
 st.title("🧠 Stroke Prediction App — V1 vs V2")
 st.caption(f"Session ID: `{st.session_state.session_id}`")
 
+# Load models
 try:
     model_v1, model_v2 = load_models()
 except Exception as e:
@@ -48,8 +56,8 @@ except Exception as e:
     st.exception(e)
     st.stop()
 
+# Collect patient input
 st.subheader("Enter Patient Details")
-
 col1, col2, col3 = st.columns(3)
 
 with col1:
@@ -68,6 +76,7 @@ with col3:
     bmi = st.number_input("BMI", min_value=0.0, value=25.0)
     smoking_status = st.selectbox("Smoking Status", ["never smoked", "formerly smoked", "smokes", "Unknown"])
 
+# Prepare input data
 input_data = {
     "gender": gender,
     "age": age,
@@ -84,6 +93,7 @@ input_df = pd.DataFrame([input_data])
 
 st.divider()
 
+# Predict when button is pressed
 if st.button("🔍 Predict (Run both V1 and V2)", type="primary"):
     v1_pred = int(model_v1.predict(input_df)[0])
     v1_prob = float(model_v1.predict_proba(input_df)[0][1])
@@ -91,6 +101,7 @@ if st.button("🔍 Predict (Run both V1 and V2)", type="primary"):
     v2_pred = int(model_v2.predict(input_df)[0])
     v2_prob = float(model_v2.predict_proba(input_df)[0][1])
 
+    # Store predictions and feedback in session history
     record = {
         "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
         "input": input_data,
@@ -103,12 +114,13 @@ if st.button("🔍 Predict (Run both V1 and V2)", type="primary"):
     }
     st.session_state.history.append(record)
 
-    # Log predictions
+    # Log predictions to the external log system
     log_event(st.session_state.session_id, "Model_V1", input_data, v1_pred, v1_prob)
     log_event(st.session_state.session_id, "Model_V2", input_data, v2_pred, v2_prob)
 
     st.success("✅ Predictions generated, stored in session state, and logged.")
 
+# Show latest prediction results
 if len(st.session_state.history) > 0:
     latest = st.session_state.history[-1]
 
@@ -127,17 +139,24 @@ if len(st.session_state.history) > 0:
         st.write("Risk level:", risk_label(latest["v2_prob"]))
         probability_gauge(latest["v2_prob"], "V2")
 
+    # Display comparison table
     st.subheader("Model Comparison Table")
-    compare_df = pd.DataFrame([
-        {"Model": "V1", "Prediction": prediction_text(latest["v1_pred"]), "Probability": latest["v1_prob"]},
-        {"Model": "V2", "Prediction": prediction_text(latest["v2_pred"]), "Probability": latest["v2_prob"]},
-    ])
+    compare_df = pd.DataFrame([{
+        "Model": "V1",
+        "Prediction": prediction_text(latest["v1_pred"]),
+        "Probability": latest["v1_prob"]
+    }, {
+        "Model": "V2",
+        "Prediction": prediction_text(latest["v2_pred"]),
+        "Probability": latest["v2_prob"]
+    }])
     st.dataframe(compare_df, use_container_width=True)
     st.bar_chart(compare_df.set_index("Model")[["Probability"]])
 
     st.divider()
     st.subheader("Feedback")
 
+    # Collect feedback
     fb1, fb2 = st.columns([1, 2])
     with fb1:
         feedback_label = st.selectbox("Was the prediction correct?", ["", "Correct", "Incorrect"], index=0)
@@ -148,7 +167,7 @@ if len(st.session_state.history) > 0:
         st.session_state.history[-1]["feedback_label"] = feedback_label
         st.session_state.history[-1]["feedback_text"] = feedback_text
 
-        # Log feedback for BOTH models
+        # Log feedback for both models
         log_event(st.session_state.session_id, "Model_V1",
                   latest["input"], latest["v1_pred"], latest["v1_prob"],
                   feedback_label=feedback_label, feedback_text=feedback_text)

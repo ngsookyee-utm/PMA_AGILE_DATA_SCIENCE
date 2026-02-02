@@ -1,8 +1,3 @@
-# monitor_dashboard.py
-# Combined: Monitoring Dashboard + History Session
-# Reads prediction_feedback_log.csv created by log_utils.py (JSON-safe logging)
-# Requires: streamlit, pandas, numpy
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -23,12 +18,16 @@ DATA_PATH = BASE_DIR / "stroke_data.csv"
 # ----------------------------
 def load_baseline_data() -> pd.DataFrame:
     """Training baseline dataset used to compare input drift."""
-    df = pd.read_csv(DATA_PATH)
-    if "id" in df.columns:
-        df = df.drop(columns=["id"])
-    if "stroke" in df.columns:
-        df = df.drop(columns=["stroke"])
-    return df
+    if DATA_PATH.exists():
+        df = pd.read_csv(DATA_PATH)
+        if "id" in df.columns:
+            df = df.drop(columns=["id"])
+        if "stroke" in df.columns:
+            df = df.drop(columns=["stroke"])
+        return df
+    else:
+        st.warning("⚠ stroke_data.csv not found in the same folder as this script. Drift comparisons need it.")
+        return pd.DataFrame()
 
 def load_logs(log_path: Path):
     """
@@ -46,12 +45,7 @@ def load_logs(log_path: Path):
 
     # Parse JSON inputs into tabular columns
     if "inputs_json" not in logs_df.columns:
-        # If user still has old format, show a helpful error
         st.error("❌ Your log file does not contain the 'inputs_json' column.")
-        st.info(
-            "Fix: Update log_utils.py to write 'inputs_json' and regenerate prediction_feedback_log.csv.\n"
-            "Then re-run the prediction app to create new logs."
-        )
         return logs_df, pd.DataFrame()
 
     inputs_series = logs_df["inputs_json"].apply(
@@ -72,7 +66,6 @@ def psi_numeric(expected: np.ndarray, actual: np.ndarray, bins: int = 10) -> flo
     if expected.size < 10 or actual.size < 10:
         return np.nan
 
-    # Use expected quantiles to define bins
     q = np.quantile(expected, np.linspace(0, 1, bins + 1))
     q[0], q[-1] = -np.inf, np.inf
 

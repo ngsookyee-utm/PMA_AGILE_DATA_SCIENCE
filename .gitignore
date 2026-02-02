@@ -2,4 +2,15 @@ venv/
 .venv/
 __pycache__/
 *.log
-*.csv
+
+# Exclude virtual environment
+venv/
+
+# Exclude model files
+*.pkl
+
+# Exclude Jupyter notebooks checkpoints
+.ipynb_checkpoints
+
+# Exclude system files
+.DS_Store
